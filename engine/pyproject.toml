@@ -1,0 +1,13 @@
+[project]
+name = "beermoney-agent"
+version = "0.1.0"
+description = "Autonomous agent for beermoney platforms"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "Alex — FLOW DEV AI", email = "flowdevai@gmail.com" },
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

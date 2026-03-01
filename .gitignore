@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Environment
+.env
+.env.local
+
+# Data (sensitive)
+engine/data/sessions/
+engine/data/screenshots/
+engine/data/profile.encrypted.json
+
+# Logs
+logs/*.log
+
+# Node (dashboard)
+node_modules/
+.next/
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db
