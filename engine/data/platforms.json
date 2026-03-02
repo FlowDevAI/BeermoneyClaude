@@ -14,8 +14,8 @@
       "payment_methods": ["paypal"],
       "frequency": "daily",
       "spain_available": true,
-      "plugin_status": "planned",
-      "active": false,
+      "plugin_status": "testing",
+      "active": true,
       "check_interval_seconds": 900,
       "notes": "Studies fill up in minutes. Fast acceptance is critical."
     },

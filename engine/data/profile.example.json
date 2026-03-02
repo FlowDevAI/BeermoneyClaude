@@ -1,0 +1,35 @@
+{
+  "first_name": "Your Name",
+  "last_name": "Your Surname",
+  "email": "your.email@example.com",
+  "age": 30,
+  "date_of_birth": "1995-01-15",
+  "gender": "male",
+  "country": "Spain",
+  "city": "Madrid",
+  "zip_code": "28001",
+  "language": "Spanish",
+  "timezone": "Europe/Madrid",
+
+  "education": "bachelors",
+  "employment_status": "employed_ft",
+  "job_title": "Software Developer",
+  "industry": "Technology",
+  "income_range": "25000-50000",
+  "household_size": 2,
+  "marital_status": "single",
+  "children": 0,
+  "ethnicity": "",
+
+  "devices": ["desktop", "laptop", "smartphone"],
+  "operating_systems": ["windows", "android"],
+  "browsers": ["chrome", "firefox"],
+  "internet_speed": "fast",
+  "social_media": ["instagram", "twitter", "linkedin"],
+
+  "interests": ["technology", "gaming", "travel", "music"],
+  "shopping_habits": ["online", "electronics", "clothing"],
+
+  "wears_glasses": false,
+  "has_disabilities": false
+}

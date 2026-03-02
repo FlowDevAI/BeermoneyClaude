@@ -22,6 +22,9 @@ from .logger import get_logger
 from .queue import HumanQueue
 from .session import SessionManager
 
+from notifier.telegram_bot import TelegramNotifier
+from notifier.alerts import AlertManager
+
 log = get_logger("agent")
 
 
@@ -37,6 +40,8 @@ class NightAgent:
         self.db = Database()
         self.sessions = SessionManager(self.browser, self.db)
         self.queue = HumanQueue(self.db)
+        self.telegram = TelegramNotifier()
+        self.alerter = AlertManager(self.telegram, self.db)
         self.plugins: list[PlatformPlugin] = []
         self.running: bool = False
         self.session_id: str = _generate_session_id()
@@ -80,6 +85,7 @@ class NightAgent:
             log.info("Agent stopped by user")
         except Exception as e:
             log.critical(f"Agent crashed: {e}")
+            await self.alerter.alert_agent_error(str(e))
             await self.db.log_event(
                 "agent_crash",
                 message=str(e),
@@ -108,8 +114,10 @@ class NightAgent:
                 success = await self.sessions.ensure_logged_in(page, plugin)
                 if not success:
                     log.warning(f"Skipping {plugin.name} (login failed)")
+                    await self.alerter.alert_login_failed(plugin.name, "Login returned False")
             except Exception as e:
                 log.error(f"{plugin.name}: Login phase error: {e}")
+                await self.alerter.alert_login_failed(plugin.name, str(e))
 
     async def _scan_tier(self, tier: int) -> None:
         """Scan all platforms in a given tier."""
@@ -168,6 +176,9 @@ class NightAgent:
             f"({task.estimated_pay} {task.currency})"
         )
 
+        # Alert for high-urgency tasks
+        await self.alerter.alert_new_task(task)
+
         # Log the opportunity
         await self.db.add_opportunity(
             {
@@ -186,6 +197,7 @@ class NightAgent:
         # Check for CAPTCHA
         captcha = await self.browser.detect_captcha(page)
         if captcha:
+            await self.alerter.alert_captcha(plugin.name, captcha)
             screenshot = await self.browser.take_screenshot(
                 page, plugin.name, "captcha"
             )
@@ -295,11 +307,14 @@ class NightAgent:
         return start <= hour < end
 
     async def _generate_morning_report(self) -> None:
-        """Generate and send morning summary. TODO: Telegram integration in Sprint 2."""
+        """Generate and send morning summary via Telegram."""
         pending = await self.queue.get_pending()
         log.info(
             f"Morning report: {len(pending)} tasks in queue"
         )
+
+        await self.alerter.send_morning_report()
+
         await self.db.log_event(
             "morning_report",
             message=f"{len(pending)} pending tasks",
