@@ -1,11 +1,11 @@
 """
-Test script for Prolific plugin.
+Test script for Clickworker plugin.
 Runs in VISIBLE mode for manual verification.
 
 Usage:
-    python scripts/test_prolific.py              # Full test
-    python scripts/test_prolific.py --login-only  # Just test login
-    python scripts/test_prolific.py --scan-only   # Just test scanning
+    python scripts/test_clickworker.py              # Full test
+    python scripts/test_clickworker.py --login-only  # Just test login
+    python scripts/test_clickworker.py --scan-only   # Just test scanning
 """
 
 import asyncio
@@ -17,13 +17,13 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 from playwright.async_api import async_playwright
-from plugins.prolific import ProlificPlugin
+from plugins.clickworker import ClickworkerPlugin
 
 
-async def test_prolific(mode: str = "full"):
-    plugin = ProlificPlugin()
+async def test_clickworker(mode: str = "full"):
+    plugin = ClickworkerPlugin()
     print(f"\n{'='*60}")
-    print(f"  PROLIFIC PLUGIN TEST  (mode: {mode})")
+    print(f"  CLICKWORKER PLUGIN TEST  (mode: {mode})")
     print(f"{'='*60}")
     print(f"  Plugin: {plugin}")
     print(f"  Login URL: {plugin.login_url}")
@@ -34,7 +34,7 @@ async def test_prolific(mode: str = "full"):
         browser = await p.chromium.launch(headless=False)
         context = await browser.new_context(
             viewport={"width": 1920, "height": 1080},
-            locale="en-GB",
+            locale="en-US",
             timezone_id="Europe/Madrid",
         )
         page = await context.new_page()
@@ -42,11 +42,11 @@ async def test_prolific(mode: str = "full"):
         # --- LOGIN TEST ---
         if mode in ("full", "login-only"):
             print("[TEST] Login flow...")
-            print("  Navigating to Prolific login page...")
+            print("  Navigating to Clickworker login page...")
             await page.goto(plugin.login_url, wait_until="networkidle", timeout=30000)
             print(f"  URL: {page.url}")
 
-            # Check if already logged in (persistent session)
+            # Check if already logged in
             is_logged = await plugin.is_logged_in(page)
             if is_logged:
                 print("  [OK] Already logged in!")
@@ -56,7 +56,12 @@ async def test_prolific(mode: str = "full"):
 
                 try:
                     await page.wait_for_url(
-                        lambda url: "app.prolific.com" in url and "/login" not in url,
+                        lambda url: (
+                            "workplace.clickworker.com" in url
+                            and "sign_in" not in url
+                            and "/login" not in url
+                            and "users/new" not in url
+                        ),
                         timeout=300_000,
                     )
                     await asyncio.sleep(3)
@@ -70,10 +75,13 @@ async def test_prolific(mode: str = "full"):
             is_logged = await plugin.is_logged_in(page)
             print(f"  is_logged_in() = {is_logged}")
 
+            # Try to get balance
+            balance = await plugin.get_balance(page)
+            print(f"  get_balance() = {balance}")
+
             if mode == "login-only":
                 print("\n[LOGIN TEST COMPLETE]")
                 print("  Browser stays open 60s for inspection.")
-                print("  Use this time to inspect the page elements.")
                 await asyncio.sleep(60)
                 await browser.close()
                 return
@@ -81,7 +89,7 @@ async def test_prolific(mode: str = "full"):
         # --- SCAN TEST ---
         if mode in ("full", "scan-only"):
             if mode == "scan-only":
-                print("[TEST] Navigating to Prolific...")
+                print("[TEST] Navigating to Clickworker...")
                 await page.goto(plugin.login_url, wait_until="networkidle", timeout=30000)
 
                 is_logged = await plugin.is_logged_in(page)
@@ -90,7 +98,12 @@ async def test_prolific(mode: str = "full"):
                     print("  Waiting up to 5 minutes...")
                     try:
                         await page.wait_for_url(
-                            lambda url: "app.prolific.com" in url and "/login" not in url,
+                            lambda url: (
+                                "workplace.clickworker.com" in url
+                                and "sign_in" not in url
+                                and "/login" not in url
+                                and "users/new" not in url
+                            ),
                             timeout=300_000,
                         )
                         await asyncio.sleep(3)
@@ -98,45 +111,47 @@ async def test_prolific(mode: str = "full"):
                     except Exception:
                         pass
 
-            print("\n[TEST] Scanning for studies...")
-            studies = await plugin.scan_available_tasks(page)
+            print("\n[TEST] Scanning for jobs...")
+            jobs = await plugin.scan_available_tasks(page)
 
-            if not studies:
-                print("  No studies found.")
-                print("  (This is normal if there are no active studies right now)")
+            if not jobs:
+                print("  No jobs found.")
+                print("  (Check if account is activated and workplace is accessible)")
             else:
-                print(f"\n  Found {len(studies)} study(ies):\n")
-                print(f"  {'Title':<40} {'Pay':>8} {'Time':>6} {'Urgency':<10}")
-                print(f"  {'-'*40} {'-'*8} {'-'*6} {'-'*10}")
-                for s in studies:
+                print(f"\n  Found {len(jobs)} job(s):\n")
+                print(f"  {'Title':<40} {'Pay':>8} {'Type':<10} {'Difficulty':<10}")
+                print(f"  {'-'*40} {'-'*8} {'-'*10} {'-'*10}")
+                for j in jobs:
+                    job_type = j.details.get("job_type", "?")
                     print(
-                        f"  {s.title[:40]:<40} "
-                        f"{s.currency} {s.estimated_pay:>5.2f} "
-                        f"{s.estimated_minutes:>4}m "
-                        f"{s.urgency.value:<10}"
+                        f"  {j.title[:40]:<40} "
+                        f"EUR {j.estimated_pay:>5.2f} "
+                        f"{job_type:<10} "
+                        f"{j.difficulty.value:<10}"
                     )
-                    if s.details.get("places_remaining", -1) > 0:
-                        print(f"    -> {s.details['places_remaining']} places remaining")
+                    if j.details.get("needs_assessment"):
+                        print(f"    -> Requires assessment")
 
             if mode == "scan-only":
                 print("\n[SCAN TEST COMPLETE]")
-                print("  Browser stays open 30s for inspection.")
-                await asyncio.sleep(30)
+                print("  Browser stays open 60s for inspection.")
+                await asyncio.sleep(60)
                 await browser.close()
                 return
 
-        # --- FULL TEST: accept ---
-        if mode == "full" and studies:
-            print(f"\n[TEST] Would you like to accept the first study?")
-            print(f"  Study: '{studies[0].title}'")
-            print(f"  Pay: {studies[0].currency} {studies[0].estimated_pay}")
-            print(f"  (Not accepting automatically in test mode)")
+        # --- FULL TEST ---
+        if mode == "full" and jobs:
+            print(f"\n[TEST] First job details:")
+            print(f"  Title: '{jobs[0].title}'")
+            print(f"  Pay: {jobs[0].currency} {jobs[0].estimated_pay}")
+            print(f"  Type: {jobs[0].details.get('job_type', '?')}")
+            print(f"  (Not starting automatically in test mode)")
 
         print(f"\n{'='*60}")
         print(f"  TEST COMPLETE")
         print(f"{'='*60}")
-        print("  Browser stays open 30s for inspection.")
-        await asyncio.sleep(30)
+        print("  Browser stays open 60s for inspection.")
+        await asyncio.sleep(60)
         await browser.close()
 
 
@@ -147,4 +162,4 @@ if __name__ == "__main__":
     elif "--scan-only" in sys.argv:
         mode = "scan-only"
 
-    asyncio.run(test_prolific(mode))
+    asyncio.run(test_clickworker(mode))

@@ -102,16 +102,20 @@ async def show_status() -> None:
     console.print(f"\n  Pending human tasks: {len(pending)}")
 
 
-async def run_night_agent() -> None:
+async def run_night_agent(duration: int = 0) -> None:
     """Start the night agent."""
+    if duration > 0:
+        time_info = f"Duration: {duration} minutes (short cycle mode)"
+    else:
+        time_info = f"Active hours: {settings.NIGHT_START_HOUR}:00 - {settings.NIGHT_END_HOUR}:00"
+
     console.print(
         Panel(
-            "[bold]Night Agent Mode[/bold]\n"
-            f"[dim]Active hours: {settings.NIGHT_START_HOUR}:00 - {settings.NIGHT_END_HOUR}:00[/dim]",
+            f"[bold]Night Agent Mode[/bold]\n[dim]{time_info}[/dim]",
             style="magenta",
         )
     )
-    agent = NightAgent()
+    agent = NightAgent(duration_minutes=duration)
     await agent.start()
 
 
@@ -143,6 +147,7 @@ async def interactive_menu() -> None:
 async def main() -> None:
     parser = argparse.ArgumentParser(description="BeermoneyClaude Agent")
     parser.add_argument("--night", action="store_true", help="Start night agent")
+    parser.add_argument("--duration", type=int, default=0, help="Night agent duration in minutes (for testing)")
     parser.add_argument("--test-browser", action="store_true", help="Test browser")
     parser.add_argument("--scan", nargs="?", const="all", help="Force scan")
     parser.add_argument("--status", action="store_true", help="Show status")
@@ -160,7 +165,7 @@ async def main() -> None:
     if args.test_browser:
         await test_browser()
     elif args.night:
-        await run_night_agent()
+        await run_night_agent(duration=args.duration)
     elif args.scan:
         console.print(f"[yellow]Force scan ({args.scan}) not yet implemented[/yellow]")
     elif args.status:

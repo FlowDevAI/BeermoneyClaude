@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(do touch:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(playwright install:*)",
+      "Bash(gh auth:*)",
+      "Bash(where gh:*)",
+      "Bash(git:*)",
+      "Bash(winget install:*)",
+      "Bash(export:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" repo:*)",
+      "Bash(PYTHONPATH=. python:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}

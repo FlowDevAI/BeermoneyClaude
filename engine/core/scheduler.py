@@ -35,7 +35,7 @@ def _generate_session_id() -> str:
 class NightAgent:
     """Main night agent that orchestrates platform scanning."""
 
-    def __init__(self) -> None:
+    def __init__(self, duration_minutes: int = 0) -> None:
         self.browser = BrowserManager()
         self.db = Database()
         self.sessions = SessionManager(self.browser, self.db)
@@ -45,11 +45,25 @@ class NightAgent:
         self.plugins: list[PlatformPlugin] = []
         self.running: bool = False
         self.session_id: str = _generate_session_id()
+        self.duration_minutes: int = duration_minutes  # 0 = use time window
+        self._start_time: float = 0.0
+
+        # Session stats
+        self.stats = {
+            "platforms_scanned": set(),
+            "tasks_detected": 0,
+            "tasks_accepted": 0,
+            "tasks_auto_completed": 0,
+            "tasks_queued": 0,
+            "errors": 0,
+            "scans": [],  # list of {platform, tasks_found, error, timestamp}
+        }
 
     async def start(self) -> None:
         """Start the night agent loop."""
         log.info(f"Night Agent starting (session: {self.session_id})")
         self.running = True
+        self._start_time = time.time()
 
         try:
             await self.browser.init()
@@ -120,7 +134,7 @@ class NightAgent:
                 await self.alerter.alert_login_failed(plugin.name, str(e))
 
     async def _scan_tier(self, tier: int) -> None:
-        """Scan all platforms in a given tier."""
+        """Scan all platforms in a given tier. Errors are isolated per plugin."""
         tier_plugins = [p for p in self.plugins if p.tier == tier]
         if not tier_plugins:
             return
@@ -133,11 +147,20 @@ class NightAgent:
 
                 # Verify session is still active
                 if not await plugin.is_logged_in(page):
+                    log.info(f"{plugin.name}: Session expired, re-logging in...")
                     if not await self.sessions.ensure_logged_in(page, plugin):
+                        log.warning(f"{plugin.name}: Re-login failed, skipping")
+                        await self.alerter.alert_login_failed(
+                            plugin.name, "Session expired and re-login failed"
+                        )
+                        self._record_scan(plugin.name, 0, error="login_failed")
                         continue
 
                 tasks = await plugin.scan_available_tasks(page)
                 log.info(f"{plugin.name}: Found {len(tasks)} tasks")
+
+                # Record scan result
+                self._record_scan(plugin.name, len(tasks))
 
                 if tasks:
                     await self.db.update_platform(
@@ -146,7 +169,10 @@ class NightAgent:
                     )
 
                 for task in tasks:
-                    await self._process_task(plugin, page, task)
+                    try:
+                        await self._process_task(plugin, page, task)
+                    except Exception as task_err:
+                        log.error(f"{plugin.name}: Error processing task '{task.title}': {task_err}")
 
                 await self.db.update_platform(
                     plugin.name,
@@ -158,11 +184,15 @@ class NightAgent:
 
             except Exception as e:
                 log.error(f"{plugin.name}: Scan error: {e}")
+                self._record_scan(plugin.name, 0, error=str(e))
+                await self.alerter.alert_agent_error(f"{plugin.name} scan failed: {e}")
                 try:
                     page = await self.browser.get_page(plugin.name)
                     await self.browser.take_screenshot(page, plugin.name, "scan_error")
                 except Exception:
                     pass
+                # Continue to next plugin — don't crash the loop
+                continue
 
     async def _process_task(
         self,
@@ -213,6 +243,7 @@ class NightAgent:
         result = await plugin.accept_task(page, task)
 
         if result.success and not result.needs_human:
+            self.stats["tasks_accepted"] += 1
             difficulty = await plugin.classify_task(task)
 
             if difficulty == TaskDifficulty.AUTO:
@@ -220,6 +251,7 @@ class NightAgent:
                     completion = await plugin.auto_complete(page, task)
                     if completion.status == "completed":
                         log.info(f"Auto-completed: {task.title}")
+                        self.stats["tasks_auto_completed"] += 1
                         await self.db.log_event(
                             "task_auto_completed",
                             platform=plugin.name,
@@ -233,6 +265,7 @@ class NightAgent:
                     log.error(f"Auto-complete failed: {e}")
 
             # Queue for human
+            self.stats["tasks_queued"] += 1
             screenshot = await self.browser.take_screenshot(
                 page, plugin.name, "queued"
             )
@@ -248,6 +281,8 @@ class NightAgent:
             )
 
         elif result.success and result.needs_human:
+            self.stats["tasks_accepted"] += 1
+            self.stats["tasks_queued"] += 1
             screenshot = await self.browser.take_screenshot(
                 page, plugin.name, "needs_human"
             )
@@ -269,7 +304,7 @@ class NightAgent:
             )
 
     def _load_active_plugins(self) -> list[PlatformPlugin]:
-        """Load active plugins from platforms.json."""
+        """Dynamically load active plugins from platforms.json."""
         platforms_path = settings.DATA_DIR / "platforms.json"
 
         if not platforms_path.exists():
@@ -279,6 +314,10 @@ class NightAgent:
         data = json.loads(platforms_path.read_text(encoding="utf-8"))
         active = [p for p in data.get("platforms", []) if p.get("active")]
 
+        if not active:
+            log.warning("No active platforms in platforms.json")
+            return []
+
         plugins: list[PlatformPlugin] = []
         for platform in active:
             slug = platform["slug"]
@@ -286,17 +325,28 @@ class NightAgent:
                 module = import_module(f"plugins.{slug}")
                 plugin_class = getattr(module, "Plugin", None)
                 if plugin_class and issubclass(plugin_class, PlatformPlugin):
-                    plugins.append(plugin_class())
-                    log.debug(f"Loaded plugin: {slug}")
-            except (ImportError, AttributeError) as e:
-                log.debug(f"Plugin not available: {slug} ({e})")
+                    instance = plugin_class()
+                    plugins.append(instance)
+                    log.info(f"Loaded plugin: {instance.display_name} (Tier {instance.tier})")
+                else:
+                    log.warning(f"Plugin {slug} has no 'Plugin' export")
+            except ImportError as e:
+                log.warning(f"Plugin module not found: {slug} ({e})")
+            except Exception as e:
+                log.error(f"Failed to load plugin {slug}: {e}")
 
-        # Sort by tier (highest priority first)
+        # Sort by tier (1 = highest priority)
         plugins.sort(key=lambda p: p.tier)
+        log.info(f"Total plugins loaded: {len(plugins)} of {len(active)} active")
         return plugins
 
     def _is_active_time(self) -> bool:
-        """Check if we're within the configured active hours."""
+        """Check if we're within the configured active hours or duration."""
+        # If duration mode is set, use elapsed time instead of clock
+        if self.duration_minutes > 0:
+            elapsed = time.time() - self._start_time
+            return elapsed < (self.duration_minutes * 60)
+
         hour = datetime.now().hour
         start = settings.NIGHT_START_HOUR
         end = settings.NIGHT_END_HOUR
@@ -306,17 +356,49 @@ class NightAgent:
             return hour >= start or hour < end
         return start <= hour < end
 
+    def _record_scan(
+        self, platform: str, tasks_found: int, error: str = ""
+    ) -> None:
+        """Record a scan result for the morning report."""
+        self.stats["platforms_scanned"].add(platform)
+        self.stats["tasks_detected"] += tasks_found
+        if error:
+            self.stats["errors"] += 1
+        self.stats["scans"].append({
+            "platform": platform,
+            "tasks_found": tasks_found,
+            "error": error,
+            "timestamp": datetime.now().isoformat(),
+        })
+
     async def _generate_morning_report(self) -> None:
         """Generate and send morning summary via Telegram."""
+        elapsed = time.time() - self._start_time if self._start_time else 0
         pending = await self.queue.get_pending()
-        log.info(
-            f"Morning report: {len(pending)} tasks in queue"
-        )
+
+        # Build summary
+        summary_lines = [
+            f"Session: {self.session_id}",
+            f"Duration: {int(elapsed // 60)}m {int(elapsed % 60)}s",
+            f"Plugins loaded: {len(self.plugins)}",
+            f"Platforms scanned: {len(self.stats['platforms_scanned'])}",
+            f"Total scans: {len(self.stats['scans'])}",
+            f"Tasks detected: {self.stats['tasks_detected']}",
+            f"Tasks accepted: {self.stats['tasks_accepted']}",
+            f"Tasks auto-completed: {self.stats['tasks_auto_completed']}",
+            f"Tasks in queue: {len(pending)}",
+            f"Errors: {self.stats['errors']}",
+        ]
+
+        log.info("=== MORNING REPORT ===")
+        for line in summary_lines:
+            log.info(f"  {line}")
+        log.info("=== END REPORT ===")
 
         await self.alerter.send_morning_report()
 
         await self.db.log_event(
             "morning_report",
-            message=f"{len(pending)} pending tasks",
+            message=" | ".join(summary_lines),
             session_id=self.session_id,
         )
