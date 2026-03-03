@@ -1,0 +1,185 @@
+import type { Platform, HumanQueueItem, Earning, AgentLog, DailyStats } from './supabase/types'
+
+export const mockPlatforms: Platform[] = [
+  {
+    id: '1', slug: 'prolific', name: 'Prolific', url: 'https://www.prolific.com',
+    login_url: 'https://app.prolific.com/login', dashboard_url: 'https://app.prolific.com/studies',
+    category: 'research', tier: 1, avg_pay_min: 9, avg_pay_max: 17, currency: 'GBP',
+    payment_methods: ['paypal'], frequency: 'daily', spain_available: true,
+    plugin_status: 'testing', active: true, check_interval_seconds: 900,
+    last_scanned_at: new Date(Date.now() - 15 * 60000).toISOString(),
+    last_task_found_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+    last_login_at: new Date(Date.now() - 30 * 60000).toISOString(),
+    login_status: 'ok', notes: null,
+    created_at: '2026-03-01T00:00:00Z', updated_at: new Date().toISOString(),
+  },
+  {
+    id: '2', slug: 'clickworker', name: 'Clickworker', url: 'https://www.clickworker.com',
+    login_url: 'https://workplace.clickworker.com/en/users/sign_in',
+    dashboard_url: 'https://workplace.clickworker.com/en/clickworker',
+    category: 'microtasks', tier: 3, avg_pay_min: 5, avg_pay_max: 15, currency: 'EUR',
+    payment_methods: ['paypal', 'bank_transfer'], frequency: 'daily', spain_available: true,
+    plugin_status: 'testing', active: true, check_interval_seconds: 3600,
+    last_scanned_at: new Date(Date.now() - 60 * 60000).toISOString(),
+    last_task_found_at: null, last_login_at: null, login_status: 'failed', notes: null,
+    created_at: '2026-03-01T00:00:00Z', updated_at: new Date().toISOString(),
+  },
+  {
+    id: '3', slug: 'respondent', name: 'Respondent', url: 'https://www.respondent.io',
+    login_url: 'https://app.respondent.io/login', dashboard_url: null,
+    category: 'research', tier: 1, avg_pay_min: 75, avg_pay_max: 200, currency: 'USD',
+    payment_methods: ['paypal', 'bank_transfer'], frequency: 'weekly', spain_available: true,
+    plugin_status: 'planned', active: false, check_interval_seconds: 900,
+    last_scanned_at: null, last_task_found_at: null, last_login_at: null,
+    login_status: 'unknown', notes: null,
+    created_at: '2026-03-01T00:00:00Z', updated_at: new Date().toISOString(),
+  },
+  {
+    id: '4', slug: 'usertesting', name: 'UserTesting', url: 'https://www.usertesting.com',
+    login_url: 'https://www.usertesting.com/login', dashboard_url: null,
+    category: 'ux_testing', tier: 1, avg_pay_min: 30, avg_pay_max: 45, currency: 'USD',
+    payment_methods: ['paypal'], frequency: 'daily', spain_available: true,
+    plugin_status: 'planned', active: false, check_interval_seconds: 900,
+    last_scanned_at: null, last_task_found_at: null, last_login_at: null,
+    login_status: 'unknown', notes: null,
+    created_at: '2026-03-01T00:00:00Z', updated_at: new Date().toISOString(),
+  },
+  {
+    id: '5', slug: 'testbirds', name: 'Testbirds', url: 'https://www.testbirds.com',
+    login_url: null, dashboard_url: null,
+    category: 'ux_testing', tier: 2, avg_pay_min: 30, avg_pay_max: 40, currency: 'EUR',
+    payment_methods: ['paypal'], frequency: 'weekly', spain_available: true,
+    plugin_status: 'planned', active: false, check_interval_seconds: 1800,
+    last_scanned_at: null, last_task_found_at: null, last_login_at: null,
+    login_status: 'unknown', notes: null,
+    created_at: '2026-03-01T00:00:00Z', updated_at: new Date().toISOString(),
+  },
+]
+
+export const mockQueueItems: HumanQueueItem[] = [
+  {
+    id: 'q1', opportunity_id: 'op1', platform_slug: 'prolific',
+    task_title: 'Research study: Consumer behavior in online shopping',
+    estimated_pay: 9.00, currency: 'GBP',
+    url: 'https://app.prolific.com/studies/abc123',
+    reason: 'opinion_survey',
+    instructions: 'Complete the Qualtrics survey. Estimated 15 minutes. The agent reserved your spot.',
+    deadline: new Date(Date.now() + 3 * 3600000).toISOString(),
+    urgency: 'high', screenshot_path: null,
+    status: 'pending', actual_earnings: null, actual_minutes: null, completed_at: null,
+    created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+  },
+  {
+    id: 'q2', opportunity_id: 'op2', platform_slug: 'clickworker',
+    task_title: 'UHRS: Search result relevance evaluation',
+    estimated_pay: 5.00, currency: 'EUR', url: null,
+    reason: 'manual_review',
+    instructions: 'Evaluate 50 search results. The agent couldn\'t auto-complete because the task requires subjective judgment.',
+    deadline: null, urgency: 'medium', screenshot_path: null,
+    status: 'pending', actual_earnings: null, actual_minutes: null, completed_at: null,
+    created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
+  },
+  {
+    id: 'q3', opportunity_id: 'op3', platform_slug: 'prolific',
+    task_title: 'UX Test: Mobile banking app prototype',
+    estimated_pay: 15.00, currency: 'GBP',
+    url: 'https://app.prolific.com/studies/xyz789',
+    reason: 'voice_test',
+    instructions: 'Think-aloud UX test requiring microphone. 20 minutes. RECORD YOUR SCREEN.',
+    deadline: new Date(Date.now() + 1 * 3600000).toISOString(),
+    urgency: 'critical', screenshot_path: null,
+    status: 'pending', actual_earnings: null, actual_minutes: null, completed_at: null,
+    created_at: new Date(Date.now() - 30 * 60000).toISOString(),
+  },
+  {
+    id: 'q4', opportunity_id: 'op4', platform_slug: 'prolific',
+    task_title: 'Academic survey: Decision making under uncertainty',
+    estimated_pay: 6.50, currency: 'GBP',
+    url: 'https://app.prolific.com/studies/def456',
+    reason: 'opinion_survey',
+    instructions: 'Standard Qualtrics survey about risk preferences. ~10 minutes.',
+    deadline: new Date(Date.now() + 8 * 3600000).toISOString(),
+    urgency: 'low', screenshot_path: null,
+    status: 'pending', actual_earnings: null, actual_minutes: null, completed_at: null,
+    created_at: new Date(Date.now() - 1 * 3600000).toISOString(),
+  },
+  {
+    id: 'q5', opportunity_id: 'op5', platform_slug: 'clickworker',
+    task_title: 'Text categorization batch',
+    estimated_pay: 3.50, currency: 'EUR', url: null,
+    reason: 'manual_review', instructions: null,
+    deadline: null, urgency: 'low', screenshot_path: null,
+    status: 'done', actual_earnings: 3.50, actual_minutes: 12,
+    completed_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+    created_at: new Date(Date.now() - 26 * 3600000).toISOString(),
+  },
+  {
+    id: 'q6', opportunity_id: 'op6', platform_slug: 'prolific',
+    task_title: 'Psychology study: Memory and attention',
+    estimated_pay: 8.00, currency: 'GBP', url: null,
+    reason: 'opinion_survey', instructions: null,
+    deadline: null, urgency: 'medium', screenshot_path: null,
+    status: 'done', actual_earnings: 8.00, actual_minutes: 18,
+    completed_at: new Date(Date.now() - 12 * 3600000).toISOString(),
+    created_at: new Date(Date.now() - 14 * 3600000).toISOString(),
+  },
+  {
+    id: 'q7', opportunity_id: null, platform_slug: 'clickworker',
+    task_title: 'Image tagging - Low pay batch',
+    estimated_pay: 0.80, currency: 'EUR', url: null,
+    reason: 'manual_review', instructions: null,
+    deadline: null, urgency: 'low', screenshot_path: null,
+    status: 'skipped', actual_earnings: null, actual_minutes: null,
+    completed_at: null,
+    created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+  },
+  {
+    id: 'q8', opportunity_id: null, platform_slug: 'prolific',
+    task_title: 'Expired study: Social media habits',
+    estimated_pay: 7.50, currency: 'GBP', url: null,
+    reason: 'opinion_survey', instructions: null,
+    deadline: new Date(Date.now() - 6 * 3600000).toISOString(),
+    urgency: 'high', screenshot_path: null,
+    status: 'expired', actual_earnings: null, actual_minutes: null,
+    completed_at: null,
+    created_at: new Date(Date.now() - 30 * 3600000).toISOString(),
+  },
+]
+
+const today = new Date()
+function daysAgo(n: number) {
+  const d = new Date(today)
+  d.setDate(d.getDate() - n)
+  return d.toISOString().split('T')[0]
+}
+
+export const mockEarnings: Earning[] = [
+  { id: 'e1', platform_id: '1', opportunity_id: null, amount: 9.00, currency: 'GBP', amount_eur: 10.44, task_type: 'survey', task_description: 'Consumer behavior study', time_spent_minutes: 15, effective_hourly_rate: 41.76, completed_by: 'human', payment_status: 'pending', payment_date: null, notes: null, completed_at: new Date(Date.now() - 2 * 3600000).toISOString(), created_at: new Date(Date.now() - 2 * 3600000).toISOString() },
+  { id: 'e2', platform_id: '2', opportunity_id: null, amount: 3.50, currency: 'EUR', amount_eur: 3.50, task_type: 'microtask', task_description: 'Text categorization', time_spent_minutes: 12, effective_hourly_rate: 17.50, completed_by: 'human', payment_status: 'pending', payment_date: null, notes: null, completed_at: new Date(Date.now() - 5 * 3600000).toISOString(), created_at: new Date(Date.now() - 5 * 3600000).toISOString() },
+  { id: 'e3', platform_id: '1', opportunity_id: null, amount: 8.00, currency: 'GBP', amount_eur: 9.28, task_type: 'survey', task_description: 'Memory study', time_spent_minutes: 18, effective_hourly_rate: 30.93, completed_by: 'human', payment_status: 'paid', payment_date: daysAgo(1), notes: null, completed_at: new Date(Date.now() - 12 * 3600000).toISOString(), created_at: new Date(Date.now() - 12 * 3600000).toISOString() },
+]
+
+export const mockAgentLogs: AgentLog[] = [
+  { id: 'l1', session_id: 'night-2026-03-03', event_type: 'start', platform_slug: null, level: 'info', message: 'Night agent started — scanning 2 platforms', details: null, screenshot_path: null, created_at: new Date(Date.now() - 6 * 3600000).toISOString() },
+  { id: 'l2', session_id: 'night-2026-03-03', event_type: 'login', platform_slug: 'prolific', level: 'info', message: 'Login successful via Auth0', details: null, screenshot_path: null, created_at: new Date(Date.now() - 5.9 * 3600000).toISOString() },
+  { id: 'l3', session_id: 'night-2026-03-03', event_type: 'login', platform_slug: 'clickworker', level: 'warning', message: 'Login failed — account not activated', details: null, screenshot_path: null, created_at: new Date(Date.now() - 5.8 * 3600000).toISOString() },
+  { id: 'l4', session_id: 'night-2026-03-03', event_type: 'scan', platform_slug: 'prolific', level: 'info', message: 'Scan completed — 3 studies found', details: { tasks_found: 3 }, screenshot_path: null, created_at: new Date(Date.now() - 5.5 * 3600000).toISOString() },
+  { id: 'l5', session_id: 'night-2026-03-03', event_type: 'accept', platform_slug: 'prolific', level: 'info', message: 'Accepted: Consumer behavior study (GBP 9.00)', details: null, screenshot_path: null, created_at: new Date(Date.now() - 5.4 * 3600000).toISOString() },
+  { id: 'l6', session_id: 'night-2026-03-03', event_type: 'queue', platform_slug: 'prolific', level: 'info', message: 'Queued for human: UX Test — requires microphone', details: null, screenshot_path: null, created_at: new Date(Date.now() - 5.3 * 3600000).toISOString() },
+  { id: 'l7', session_id: 'night-2026-03-03', event_type: 'scan', platform_slug: 'prolific', level: 'info', message: 'Scan completed — 1 study found', details: { tasks_found: 1 }, screenshot_path: null, created_at: new Date(Date.now() - 4 * 3600000).toISOString() },
+  { id: 'l8', session_id: 'night-2026-03-03', event_type: 'accept', platform_slug: 'prolific', level: 'info', message: 'Accepted: Decision making survey (GBP 6.50)', details: null, screenshot_path: null, created_at: new Date(Date.now() - 3.9 * 3600000).toISOString() },
+  { id: 'l9', session_id: 'night-2026-03-03', event_type: 'captcha', platform_slug: 'prolific', level: 'warning', message: 'CAPTCHA detected — reCAPTCHA v2', details: null, screenshot_path: null, created_at: new Date(Date.now() - 3 * 3600000).toISOString() },
+  { id: 'l10', session_id: 'night-2026-03-03', event_type: 'scan', platform_slug: 'prolific', level: 'info', message: 'Scan completed — 0 studies found', details: { tasks_found: 0 }, screenshot_path: null, created_at: new Date(Date.now() - 2 * 3600000).toISOString() },
+  { id: 'l11', session_id: 'night-2026-03-03', event_type: 'error', platform_slug: 'clickworker', level: 'error', message: 'Workplace returned 404 — account not activated', details: null, screenshot_path: null, created_at: new Date(Date.now() - 1.5 * 3600000).toISOString() },
+  { id: 'l12', session_id: 'night-2026-03-03', event_type: 'stop', platform_slug: null, level: 'info', message: 'Night agent stopped — morning report sent', details: null, screenshot_path: null, created_at: new Date(Date.now() - 1 * 3600000).toISOString() },
+]
+
+export const mockDailyStats: DailyStats[] = [
+  { id: 'd1', date: daysAgo(6), total_earned_eur: 5.20, total_time_minutes: 35, effective_hourly_rate: 8.91, tasks_completed: 2, tasks_by_agent: 0, tasks_by_human: 2, opportunities_detected: 5, opportunities_accepted: 3, platforms_scanned: 1, best_platform: 'prolific', best_hourly_rate: 10.44, created_at: daysAgo(6) },
+  { id: 'd2', date: daysAgo(5), total_earned_eur: 0, total_time_minutes: 0, effective_hourly_rate: null, tasks_completed: 0, tasks_by_agent: 0, tasks_by_human: 0, opportunities_detected: 2, opportunities_accepted: 0, platforms_scanned: 1, best_platform: null, best_hourly_rate: null, created_at: daysAgo(5) },
+  { id: 'd3', date: daysAgo(4), total_earned_eur: 12.80, total_time_minutes: 55, effective_hourly_rate: 13.96, tasks_completed: 3, tasks_by_agent: 1, tasks_by_human: 2, opportunities_detected: 8, opportunities_accepted: 4, platforms_scanned: 2, best_platform: 'prolific', best_hourly_rate: 15.60, created_at: daysAgo(4) },
+  { id: 'd4', date: daysAgo(3), total_earned_eur: 8.50, total_time_minutes: 40, effective_hourly_rate: 12.75, tasks_completed: 2, tasks_by_agent: 0, tasks_by_human: 2, opportunities_detected: 4, opportunities_accepted: 2, platforms_scanned: 2, best_platform: 'prolific', best_hourly_rate: 14.20, created_at: daysAgo(3) },
+  { id: 'd5', date: daysAgo(2), total_earned_eur: 15.30, total_time_minutes: 70, effective_hourly_rate: 13.11, tasks_completed: 4, tasks_by_agent: 1, tasks_by_human: 3, opportunities_detected: 10, opportunities_accepted: 5, platforms_scanned: 2, best_platform: 'prolific', best_hourly_rate: 16.80, created_at: daysAgo(2) },
+  { id: 'd6', date: daysAgo(1), total_earned_eur: 9.28, total_time_minutes: 30, effective_hourly_rate: 18.56, tasks_completed: 2, tasks_by_agent: 0, tasks_by_human: 2, opportunities_detected: 6, opportunities_accepted: 3, platforms_scanned: 2, best_platform: 'prolific', best_hourly_rate: 18.56, created_at: daysAgo(1) },
+  { id: 'd7', date: daysAgo(0), total_earned_eur: 13.94, total_time_minutes: 45, effective_hourly_rate: 18.59, tasks_completed: 3, tasks_by_agent: 0, tasks_by_human: 3, opportunities_detected: 7, opportunities_accepted: 4, platforms_scanned: 2, best_platform: 'prolific', best_hourly_rate: 20.88, created_at: daysAgo(0) },
+]
