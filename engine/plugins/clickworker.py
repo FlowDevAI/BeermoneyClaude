@@ -47,7 +47,7 @@ class ClickworkerPlugin(PlatformPlugin):
     display_name = "Clickworker"
     url = "https://www.clickworker.com"
     login_url = "https://workplace.clickworker.com/en/users/sign_in"  # TODO: VERIFY URL
-    dashboard_url = "https://workplace.clickworker.com/en/clickworker"  # TODO: VERIFY URL
+    dashboard_url = "https://workplace.clickworker.com/en/workplace/jobs"
     tier = 3
     category = "microtasks"
     check_interval = 3600  # 60 minutes
