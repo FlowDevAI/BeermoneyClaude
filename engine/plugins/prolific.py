@@ -257,9 +257,10 @@ class ProlificPlugin(PlatformPlugin):
             current_url = page.url
             if self.dashboard_url not in current_url:
                 await page.goto(
-                    self.dashboard_url, wait_until="networkidle", timeout=30000
+                    self.dashboard_url, wait_until="domcontentloaded", timeout=30000
                 )
-                await asyncio.sleep(2)
+                # Vue.js SPA needs extra time to hydrate and render studies
+                await page.wait_for_timeout(5000)
 
             final_url = page.url
             log.info(f"Studies page URL: {final_url}")

@@ -22,6 +22,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
+from core.browser import BrowserManager
 from core.config import settings
 from core.scheduler import NightAgent
 from core.logger import get_logger
@@ -58,15 +59,14 @@ class TestNightAgent(NightAgent):
         console.print(Panel(
             f"[bold]Night Agent Test[/bold]\n"
             f"Duration: {self.duration_minutes} min | "
-            f"Headless: {settings.HEADLESS} | "
+            f"Headless: False (forced visible) | "
             f"Session: {self.session_id}",
             style="magenta",
         ))
 
         try:
             # Use visible browser for testing
-            self.browser.headless = False
-
+            self.browser = BrowserManager(headless=False)
             await self.browser.init()
             self.plugins = self._load_active_plugins()
 
@@ -90,39 +90,58 @@ class TestNightAgent(NightAgent):
                 )
             console.print(table)
 
-            # Login phase
+            # Login phase — use one page per plugin, reuse for scan
             console.print("\n[bold]Phase 1: Login[/bold]")
+            plugin_pages: dict[str, object] = {}
+
             for plugin in self.plugins:
                 try:
                     page = await self.browser.get_page(plugin.name)
+                    plugin_pages[plugin.name] = page
                     console.print(f"  Logging into {plugin.display_name}...")
                     console.print(f"    URL: {plugin.login_url}")
 
-                    await page.goto(plugin.login_url, wait_until="networkidle", timeout=30000)
+                    # Navigate — don't fail if networkidle times out
+                    try:
+                        await page.goto(plugin.login_url, wait_until="domcontentloaded", timeout=30000)
+                    except Exception as nav_err:
+                        console.print(f"    [dim]Navigation note: {str(nav_err)[:60]}[/dim]")
 
+                    await asyncio.sleep(2)
                     is_logged = await plugin.is_logged_in(page)
                     if is_logged:
-                        console.print(f"  [green]  {plugin.display_name}: Already logged in[/green]")
+                        console.print(f"    [green]Already logged in![/green]")
                         self.login_results[plugin.name] = True
                     else:
-                        console.print(f"  [yellow]  {plugin.display_name}: Not logged in. Login manually![/yellow]")
+                        console.print(f"    [yellow]Not logged in. Login manually in the browser![/yellow]")
                         console.print(f"    Waiting up to 3 minutes...")
 
                         try:
-                            # Generic wait: URL changes from login page
-                            await page.wait_for_url(
-                                lambda url, p=plugin: (
-                                    "/login" not in url
-                                    and "sign_in" not in url
-                                    and "auth0" not in url
-                                    and "auth.prolific" not in url
-                                    and "users/new" not in url
-                                    and "accounts.google.com" not in url
-                                ),
-                                timeout=180_000,
-                            )
-                            await asyncio.sleep(2)
-                            await page.wait_for_load_state("networkidle")
+                            # Wait for URL to land on the actual platform dashboard
+                            if "prolific" in plugin.name:
+                                await page.wait_for_url(
+                                    lambda url: "app.prolific.com" in url and "/login" not in url,
+                                    timeout=180_000,
+                                )
+                            elif "clickworker" in plugin.name:
+                                await page.wait_for_url(
+                                    lambda url: (
+                                        "workplace.clickworker.com" in url
+                                        and "sign_in" not in url
+                                        and "users/new" not in url
+                                    ),
+                                    timeout=180_000,
+                                )
+                            else:
+                                await page.wait_for_url(
+                                    lambda url: "/login" not in url and "sign_in" not in url,
+                                    timeout=180_000,
+                                )
+                            await asyncio.sleep(3)
+                            try:
+                                await page.wait_for_load_state("networkidle", timeout=10000)
+                            except Exception:
+                                pass
                             is_logged = await plugin.is_logged_in(page)
                             self.login_results[plugin.name] = is_logged
                             if is_logged:
@@ -130,14 +149,14 @@ class TestNightAgent(NightAgent):
                             else:
                                 console.print(f"    [yellow]URL changed but login not confirmed[/yellow]")
                         except Exception as e:
-                            console.print(f"    [red]Login timeout: {e}[/red]")
+                            console.print(f"    [red]Login timeout (3 min expired)[/red]")
                             self.login_results[plugin.name] = False
 
                 except Exception as e:
                     console.print(f"  [red]  {plugin.display_name}: Error: {e}[/red]")
                     self.login_results[plugin.name] = False
 
-            # Scan phase
+            # Scan phase — reuse same pages from login
             console.print("\n[bold]Phase 2: Scan[/bold]")
             self.running = True
 
@@ -147,7 +166,11 @@ class TestNightAgent(NightAgent):
                     continue
 
                 try:
-                    page = await self.browser.get_page(plugin.name)
+                    page = plugin_pages.get(plugin.name)
+                    if not page:
+                        console.print(f"  [red]No page for {plugin.display_name}[/red]")
+                        continue
+
                     console.print(f"  Scanning {plugin.display_name}...")
 
                     tasks = await plugin.scan_available_tasks(page)
@@ -177,7 +200,10 @@ class TestNightAgent(NightAgent):
             console.print(f"\n[red]Test failed: {e}[/red]")
             log.error(f"Test failed: {e}")
         finally:
-            await self.browser.close()
+            try:
+                await self.browser.close()
+            except Exception:
+                pass  # Browser may already be closed
 
     def _print_report(self) -> None:
         """Print a summary report of the test."""

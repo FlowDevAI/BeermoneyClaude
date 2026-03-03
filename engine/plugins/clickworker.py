@@ -47,7 +47,7 @@ class ClickworkerPlugin(PlatformPlugin):
     display_name = "Clickworker"
     url = "https://www.clickworker.com"
     login_url = "https://workplace.clickworker.com/en/users/sign_in"  # TODO: VERIFY URL
-    dashboard_url = "https://workplace.clickworker.com/en/jobs"  # TODO: VERIFY URL
+    dashboard_url = "https://workplace.clickworker.com/en/clickworker"  # TODO: VERIFY URL
     tier = 3
     category = "microtasks"
     check_interval = 3600  # 60 minutes
@@ -303,13 +303,13 @@ class ClickworkerPlugin(PlatformPlugin):
         jobs: list[DetectedTask] = []
 
         try:
-            # Navigate to jobs page
+            # Navigate to jobs/dashboard page
             current_url = page.url
             if self.dashboard_url not in current_url:
                 await page.goto(
-                    self.dashboard_url, wait_until="networkidle", timeout=30000
+                    self.dashboard_url, wait_until="domcontentloaded", timeout=30000
                 )
-                await asyncio.sleep(2)
+                await page.wait_for_timeout(3000)
 
             final_url = page.url
             log.info(f"Jobs page URL: {final_url}")

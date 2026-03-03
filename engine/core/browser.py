@@ -44,12 +44,13 @@ class ElementNotFoundError(Exception):
 class BrowserManager:
     """Manages Chromium with persistent context and human-like behavior."""
 
-    def __init__(self) -> None:
+    def __init__(self, headless: bool | None = None) -> None:
         self.playwright = None
         self.context: BrowserContext | None = None
         self.pages: dict[str, Page] = {}
         self._user_agent: str = random.choice(USER_AGENTS)
         self._viewport: dict[str, int] = random.choice(VIEWPORTS)
+        self._headless: bool = headless if headless is not None else settings.HEADLESS
 
     async def init(self) -> None:
         """Initialize Playwright with persistent browser context."""
@@ -57,7 +58,7 @@ class BrowserManager:
 
         self.context = await self.playwright.chromium.launch_persistent_context(
             user_data_dir=str(settings.SESSIONS_DIR / "browser_profile"),
-            headless=settings.HEADLESS,
+            headless=self._headless,
             user_agent=self._user_agent,
             viewport=self._viewport,
             locale="es-ES",
@@ -68,7 +69,7 @@ class BrowserManager:
         )
 
         log.info(
-            f"Browser initialized (headless={settings.HEADLESS}, "
+            f"Browser initialized (headless={self._headless}, "
             f"viewport={self._viewport['width']}x{self._viewport['height']})"
         )
 

@@ -214,7 +214,7 @@
       "name": "Clickworker",
       "url": "https://www.clickworker.com",
       "login_url": "https://workplace.clickworker.com/en/users/sign_in",
-      "dashboard_url": "https://workplace.clickworker.com/en/jobs",
+      "dashboard_url": "https://workplace.clickworker.com/en/clickworker",
       "category": "microtasks",
       "tier": 3,
       "avg_pay_min": 5,
